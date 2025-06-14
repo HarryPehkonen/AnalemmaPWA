@@ -1,0 +1,31 @@
+{
+  "name": "analemma-pwa",
+  "version": "1.0.0",
+  "description": "A Progressive Web App that shows solar noon time and analemma visualization",
+  "main": "src/index.html",
+  "scripts": {
+    "generate-data": "node tools/generate-analemma-data.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:integration": "playwright test",
+    "dev": "python3 -m http.server 8000 --directory src --bind 0.0.0.0",
+    "start": "http-server src -S -C cert.pem -K key.pem -p 8443 -o",
+    "build": "npm run generate-data"
+  },
+  "keywords": ["pwa", "astronomy", "analemma", "solar", "sun"],
+  "author": "Project Analemma",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@playwright/test": "^1.40.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": ["**/tests/unit/**/*.test.js"],
+    "collectCoverageFrom": [
+      "src/js/**/*.js",
+      "!src/js/**/*.test.js"
+    ]
+  }
+} 

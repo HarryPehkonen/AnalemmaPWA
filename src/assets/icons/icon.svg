@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Background circle -->
+  <circle cx="96" cy="96" r="96" fill="#1e40af"/>
+  
+  <!-- Sun rays -->
+  <g stroke="#fbbf24" stroke-width="4" stroke-linecap="round">
+    <line x1="96" y1="20" x2="96" y2="35"/>
+    <line x1="96" y1="157" x2="96" y2="172"/>
+    <line x1="20" y1="96" x2="35" y2="96"/>
+    <line x1="157" y1="96" x2="172" y2="96"/>
+    <line x1="43.5" y1="43.5" x2="53.7" y2="53.7"/>
+    <line x1="138.3" y1="138.3" x2="148.5" y2="148.5"/>
+    <line x1="148.5" y1="43.5" x2="138.3" y2="53.7"/>
+    <line x1="53.7" y1="138.3" x2="43.5" y2="148.5"/>
+  </g>
+  
+  <!-- Central sun -->
+  <circle cx="96" cy="96" r="25" fill="#fbbf24"/>
+  
+  <!-- Analemma figure-8 path -->
+  <path d="M 96 65 
+           C 110 55, 110 75, 96 85
+           C 82 95, 82 75, 96 65
+           M 96 85
+           C 110 95, 110 115, 96 125
+           C 82 135, 82 115, 96 85" 
+        stroke="#fbbf24" stroke-width="2" fill="none" opacity="0.8"/>
+</svg> 

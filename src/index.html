@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analemma - Solar Noon Tracker</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Theme color -->
+    <meta name="theme-color" content="#1e3a8a">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    
+    <!-- PWA support -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Analemma">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Location permission prompt -->
+        <div id="location-prompt" class="permission-prompt hidden">
+            <div class="prompt-content">
+                <h2>Location Required</h2>
+                <p>This app needs your location to calculate accurate solar noon times and show the analemma for your specific position on Earth.</p>
+                <button id="grant-location-btn" class="primary-btn">Grant Location Access</button>
+            </div>
+        </div>
+
+        <!-- Location denied message -->
+        <div id="location-denied" class="error-message hidden">
+            <div class="error-content">
+                <h2>Sorry, we can't show anything without your location</h2>
+                <p>The analemma and solar noon time depend on your geographic position. Please grant location permission to use this app.</p>
+                <button id="retry-location-btn" class="primary-btn">Try Again</button>
+            </div>
+        </div>
+
+        <!-- Main app content -->
+        <main id="main-content" class="hidden">
+            <!-- Solar noon time display -->
+            <section id="solar-time" class="time-section">
+                <h1>Solar Noon Today</h1>
+                <div id="noon-time" class="time-display">Loading...</div>
+                <div id="location-info" class="location-info"></div>
+                <!-- Status indicators -->
+                <div id="status-indicators" class="status-indicators">
+                    <div id="online-status" class="status-indicator">
+                        <span class="status-icon">🌐</span>
+                        <span class="status-text">Online</span>
+                    </div>
+                    <div id="location-status" class="status-indicator">
+                        <span class="status-icon">📍</span>
+                        <span class="status-text">Current Location</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analemma visualization -->
+            <section id="analemma-section" class="visualization-section">
+                <div id="extreme-latitude-message" class="extreme-message hidden">
+                    The sun is below the horizon at solar noon
+                </div>
+                <svg id="analemma-svg" viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Analemma path will be drawn here -->
+                    <path id="analemma-path" class="analemma-line" fill="none"/>
+                    <!-- Sun position marker -->
+                    <g id="sun-marker" class="sun-icon">
+                        <!-- Custom sun SVG will be inserted here -->
+                    </g>
+                </svg>
+            </section>
+
+            <!-- Directional indicator -->
+            <section id="direction-section" class="direction-section">
+                <div id="direction-arrow" class="direction-arrow">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#60a5fa"/>
+                                <stop offset="100%" style="stop-color:#1e40af"/>
+                            </linearGradient>
+                        </defs>
+                        <path id="arrow-path" class="arrow-shape" 
+                              d="M50 10 L75 35 L60 35 L60 65 L40 65 L40 35 L25 35 Z" 
+                              fill="url(#arrowGradient)"/>
+                    </svg>
+                    <div id="direction-label" class="direction-label">S</div>
+                </div>
+                <p class="direction-text">Look this direction to see the analemma in the sky</p>
+            </section>
+        </main>
+
+        <!-- Loading spinner -->
+        <div id="loading" class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Calculating solar position...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/calculations/solar.js"></script>
+    <script src="js/calculations/analemma.js"></script>
+    <script src="js/utils/location.js"></script>
+    <script src="js/ui/display.js"></script>
+    <script src="js/ui/visualization.js"></script>
+    <script src="js/app.js"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('SW registered successfully:', registration);
+                    })
+                    .catch(error => {
+                        console.log('SW registration failed:', error.message);
+                        // App still works without service worker, just without offline capability
+                        if (error.name === 'SecurityError') {
+                            console.log('Note: Service worker disabled due to SSL certificate issue (app still functional)');
+                        }
+                    });
+            });
+        }
+    </script>
+</body>
+</html> 
