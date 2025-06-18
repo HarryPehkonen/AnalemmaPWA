@@ -9,7 +9,7 @@
     "test:watch": "jest --watch",
     "test:integration": "playwright test",
     "dev": "python3 -m http.server 8000 --directory src --bind 0.0.0.0",
-    "start": "http-server src -S -C cert.pem -K key.pem -p 8443 -o",
+    "start": "http-server src -S -C cert.pem -K key.pem -p 8443 -a 0.0.0.0 -o",
     "build": "npm run generate-data"
   },
   "keywords": ["pwa", "astronomy", "analemma", "solar", "sun"],

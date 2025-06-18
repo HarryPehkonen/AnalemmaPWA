@@ -74,8 +74,6 @@ describe('Sun Marker Positioning Tests', () => {
         expect(coords.x).toBeDefined(); // Equation of time
         expect(coords.y).toBeDefined(); // Solar declination
         expect(coords.dayOfYear).toBe(5);
-        
-        console.log('Day 5 coordinates:', coords);
     });
 
     test('should convert coordinates to SVG space consistently', async () => {
@@ -83,28 +81,15 @@ describe('Sun Marker Positioning Tests', () => {
         const allCoords = await AnalemmaCalculations.getAllAnalemmaCoordinates();
         const todayCoords = await AnalemmaCalculations.getAnalemmaCoordinatesForDate(new Date(2024, 0, 5));
         
-        console.log('All coordinates count:', allCoords.length);
-        console.log('Today coordinates:', todayCoords);
-        
         // Test the current (broken) approach - converting separately
         const allSvgCoords = AnalemmaCalculations.convertToSVGCoordinates(allCoords);
         const todaySvgCoords = AnalemmaCalculations.convertToSVGCoordinates([todayCoords]);
-        
-        console.log('Separate conversion - All coords bounds:');
-        console.log('X range:', Math.min(...allSvgCoords.map(c => c.svgX)), 'to', Math.max(...allSvgCoords.map(c => c.svgX)));
-        console.log('Y range:', Math.min(...allSvgCoords.map(c => c.svgY)), 'to', Math.max(...allSvgCoords.map(c => c.svgY)));
-        console.log('Today SVG coords (separate):', todaySvgCoords[0]);
         
         // Test the fixed approach - converting together
         const allCoordsWithToday = [...allCoords, todayCoords];
         const combinedSvgCoords = AnalemmaCalculations.convertToSVGCoordinates(allCoordsWithToday);
         const analemmaCoords = combinedSvgCoords.slice(0, allCoords.length);
         const todayCombined = combinedSvgCoords.slice(-1)[0];
-        
-        console.log('Combined conversion - All coords bounds:');
-        console.log('X range:', Math.min(...analemmaCoords.map(c => c.svgX)), 'to', Math.max(...analemmaCoords.map(c => c.svgX)));
-        console.log('Y range:', Math.min(...analemmaCoords.map(c => c.svgY)), 'to', Math.max(...analemmaCoords.map(c => c.svgY)));
-        console.log('Today SVG coords (combined):', todayCombined);
         
         // The coordinates should be within the SVG bounds (0-400 for x, 0-300 for y with padding)
         expect(todayCombined.svgX).toBeGreaterThan(0);
@@ -128,7 +113,6 @@ describe('Sun Marker Positioning Tests', () => {
         const testCoord = { x: 5.0, y: 10.0, dayOfYear: 150 };
         
         const singleResult = AnalemmaCalculations.convertToSVGCoordinates([testCoord]);
-        console.log('Single coordinate result:', singleResult[0]);
         
         const rangeCoords = [
             { x: -14.6, y: -23.45, dayOfYear: 1 },
@@ -138,10 +122,6 @@ describe('Sun Marker Positioning Tests', () => {
         
         const rangeResult = AnalemmaCalculations.convertToSVGCoordinates(rangeCoords);
         const testPointInRange = rangeResult[2];
-        
-        console.log('Range result for same point:', testPointInRange);
-        console.log('X difference:', Math.abs(singleResult[0].svgX - testPointInRange.svgX));
-        console.log('Y difference:', Math.abs(singleResult[0].svgY - testPointInRange.svgY));
         
         expect(singleResult[0].svgX).not.toEqual(testPointInRange.svgX);
         expect(singleResult[0].svgY).not.toEqual(testPointInRange.svgY);
@@ -160,8 +140,6 @@ describe('Sun Marker Positioning Tests', () => {
             yMax: Math.max(...yValues)
         };
         
-        console.log('Actual data bounds:', actualBounds);
-        
         // These should match approximately with our expected analemma bounds
         expect(actualBounds.xMin).toBeLessThan(0); // Equation of time goes negative
         expect(actualBounds.xMax).toBeGreaterThan(0); // And positive
@@ -173,10 +151,7 @@ describe('Sun Marker Positioning Tests', () => {
         const june14 = new Date(2024, 5, 14); // June 14th (month is 0-indexed)
         const dayOfYear = SolarCalculations.getDayOfYear(june14);
         
-        console.log('June 14th day of year:', dayOfYear);
-        
         const coords = await AnalemmaCalculations.getAnalemmaCoordinatesForDate(june14);
-        console.log('June 14th analemma coordinates:', coords);
         
         // June 14th should be:
         // - Near summer solstice, so high positive declination
@@ -189,8 +164,6 @@ describe('Sun Marker Positioning Tests', () => {
         const allWithToday = [...allCoords, coords];
         const svgCoords = AnalemmaCalculations.convertToSVGCoordinates(allWithToday);
         const june14Svg = svgCoords[svgCoords.length - 1];
-        
-        console.log('June 14th SVG coordinates:', june14Svg);
         
         // Should be positioned in upper part of analemma (high Y value means lower on screen)
         // With SVG Y-axis flipped, high declination should result in LOW Y values

@@ -3,14 +3,57 @@
  * Coordinates all functionality and manages application state
  */
 
+// Import logic modules (in browser, these would be loaded via script tags)
+const StatusLogic = (typeof window !== 'undefined' && window.StatusLogic) || 
+                   (typeof require !== 'undefined' && require('./core/status-logic.js'));
+const UIHelpers = (typeof window !== 'undefined' && window.UIHelpers) || 
+                  (typeof require !== 'undefined' && require('./ui/ui-helpers.js'));
+
 class AnalemmaPWA {
-    constructor() {
-        this.currentLocation = null;
-        this.currentDate = new Date();
-        this.isInitialized = false;
+    constructor(dependencies = {}) {
+        // Dependency injection for testability
+        this.StatusLogic = dependencies.StatusLogic || StatusLogic;
+        this.UIHelpers = dependencies.UIHelpers || UIHelpers;
+        this.LocationUtils = dependencies.LocationUtils || (typeof window !== 'undefined' && window.LocationUtils);
+        this.SolarCalculations = dependencies.SolarCalculations || (typeof window !== 'undefined' && window.SolarCalculations);
+        this.AnalemmaCalculations = dependencies.AnalemmaCalculations || (typeof window !== 'undefined' && window.AnalemmaCalculations);
+        
+        // Application state
+        this.state = {
+            location: null,
+            permissionState: null,
+            isLoading: false,
+            hasError: false,
+            errorMessage: null,
+            isOnline: true,
+            currentDate: new Date()
+        };
         
         // DOM element references
-        this.elements = {
+        this.elements = this._getElements();
+        
+        // Screens mapping for showScreen function
+        this.screens = {
+            prompt: this.elements.locationPrompt,
+            denied: this.elements.locationDenied,
+            error: this.elements.locationDenied, // Reuse denied screen for errors
+            loading: this.elements.loading,
+            main: this.elements.mainContent
+        };
+        
+        this.bindEvents();
+        this.updateOnlineStatus(navigator.onLine);
+    }
+
+    /**
+     * Get DOM elements (separated for testability)
+     */
+    _getElements() {
+        if (typeof document === 'undefined') {
+            return {}; // Return empty object in test environment
+        }
+        
+        return {
             app: document.getElementById('app'),
             locationPrompt: document.getElementById('location-prompt'),
             locationDenied: document.getElementById('location-denied'),
@@ -29,32 +72,30 @@ class AnalemmaPWA {
             onlineStatus: document.getElementById('online-status'),
             locationStatus: document.getElementById('location-status')
         };
-        
-        // Status tracking
-        this.isOnline = navigator.onLine;
-        this.locationSource = 'none'; // 'current', 'cached', 'test'
-        
-        this.bindEvents();
-        this.updateOnlineStatus(this.isOnline); // Initialize online status display
     }
 
     /**
      * Bind event listeners
      */
     bindEvents() {
+        if (typeof window === 'undefined') return; // Skip in test environment
+        
         // Location permission buttons
         this.elements.grantLocationBtn?.addEventListener('click', () => this.requestLocation());
         this.elements.retryLocationBtn?.addEventListener('click', () => this.requestLocation());
         
         // Online/offline status
-        window.addEventListener('online', () => this.updateOnlineStatus(true));
-        window.addEventListener('offline', () => this.updateOnlineStatus(false));
+        window.addEventListener('online', () => this.updateOnlineStatusWithConnectivityCheck());
+        window.addEventListener('offline', () => this.updateOnlineStatusWithConnectivityCheck());
         
         // Update every minute
         setInterval(() => this.updateTimeDisplay(), 60000);
         
         // Update daily at midnight
         setInterval(() => this.checkDateChange(), 60000);
+
+        // Initial online status check
+        this.updateOnlineStatusWithConnectivityCheck();
     }
 
     /**
@@ -62,24 +103,25 @@ class AnalemmaPWA {
      */
     async initialize() {
         try {
-            
             // Check if we have a saved location
-            const savedLocation = window.LocationUtils.getSavedLocation();
+            const savedLocation = this.LocationUtils.getSavedLocation();
             if (savedLocation) {
                 console.log('Found saved location');
+                this.state.location = savedLocation;
+                this.state.permissionState = await this.LocationUtils.getLocationPermissionState();
                 await this.setLocation(savedLocation);
                 return;
             }
             
             // Check current permission state
-            const permissionState = await window.LocationUtils.getLocationPermissionState();
+            this.state.permissionState = await this.LocationUtils.getLocationPermissionState();
             
-            if (permissionState === window.LocationUtils.LocationPermissionState.GRANTED) {
+            if (this.state.permissionState === 'granted') {
                 console.log('Location permission already granted');
                 await this.requestLocation();
             } else {
                 console.log('Location permission required');
-                this.showLocationPrompt();
+                this.updateScreen();
             }
             
         } catch (error) {
@@ -93,33 +135,41 @@ class AnalemmaPWA {
      */
     async requestLocation() {
         try {
-            this.showLoading('Getting your location...');
+            this.state.isLoading = true;
+            this.state.hasError = false;
+            this.updateScreen('Getting your location...');
             
-            const location = await window.LocationUtils.requestLocation();
+            const location = await this.LocationUtils.requestLocation();
+            this.state.permissionState = await this.LocationUtils.getLocationPermissionState();
             await this.setLocation(location);
             
         } catch (error) {
             console.error('Location request failed:', error);
+            this.state.isLoading = false;
             
             if (error.message.includes('denied')) {
-                this.showLocationDenied();
+                this.state.permissionState = 'denied';
+                this.updateScreen();
             } else {
                 // For testing purposes, offer to use a default location
-                const useTestLocation = confirm(
-                    'Location request failed. Would you like to use a test location (Vancouver, BC) for debugging?'
-                );
-                
-                if (useTestLocation) {
-                    const testLocation = {
-                        latitude: 49.2827,
-                        longitude: -123.1207,
-                        accuracy: 100,
-                        timestamp: Date.now()
-                    };
-                    await this.setLocation(testLocation);
-                } else {
-                    this.showError(`Location error: ${error.message}`);
+                if (typeof confirm !== 'undefined') {
+                    const useTestLocation = confirm(
+                        'Location request failed. Would you like to use a test location (Vancouver, BC) for debugging?'
+                    );
+                    
+                    if (useTestLocation) {
+                        const testLocation = {
+                            latitude: 49.2827,
+                            longitude: -123.1207,
+                            accuracy: 100,
+                            timestamp: Date.now()
+                        };
+                        await this.setLocation(testLocation);
+                        return;
+                    }
                 }
+                
+                this.showError(`Location error: ${error.message}`);
             }
         }
     }
@@ -131,21 +181,28 @@ class AnalemmaPWA {
     async setLocation(location) {
         try {
             // Validate coordinates
-            const validation = window.SolarCalculations.validateCoordinates(location.latitude, location.longitude);
+            const validation = this.SolarCalculations.validateCoordinates(location.latitude, location.longitude);
             if (!validation.isValid) {
                 throw new Error(validation.error);
             }
 
-            this.currentLocation = location;
-            console.log(`Location set: ${window.LocationUtils.formatLocationForDisplay(location)}`);
+            this.state.location = location;
+            this.state.isLoading = false;
+            this.state.hasError = false;
+            
+            // Update permission state if not already set
+            if (!this.state.permissionState) {
+                this.state.permissionState = await this.LocationUtils.getLocationPermissionState();
+            }
+            
+            console.log(`Location set: ${this.LocationUtils.formatLocationForDisplay(location)}`);
             
             // Update all displays
             await this.updateAllDisplays();
             
-            // Show main content
-            this.showMainContent();
-            
-            this.isInitialized = true;
+            // Update UI state
+            this.updateScreen();
+            this.updateLocationStatus();
             
         } catch (error) {
             console.error('Error setting location:', error);
@@ -154,10 +211,88 @@ class AnalemmaPWA {
     }
 
     /**
+     * Update the screen based on current state
+     * @param {string} loadingMessage - Optional loading message
+     */
+    updateScreen(loadingMessage = null) {
+        const activeScreen = this.StatusLogic.getActiveScreen(this.state);
+        this.UIHelpers.showScreen(this.screens, activeScreen);
+        
+        if (loadingMessage) {
+            this.UIHelpers.updateLoadingMessage(this.elements.loading, loadingMessage);
+        }
+    }
+
+    /**
+     * Update location status indicator
+     */
+    updateLocationStatus() {
+        const status = this.StatusLogic.getLocationStatus(
+            this.state.location,
+            this.state.permissionState
+        );
+        this.UIHelpers.updateLocationStatusUI(this.elements.locationStatus, status);
+    }
+
+    /**
+     * Update online status display
+     * @param {boolean} isOnline Whether the device is online
+     */
+    updateOnlineStatus(isOnline) {
+        this.state.isOnline = isOnline;
+        const status = this.StatusLogic.getOnlineStatus(isOnline);
+        this.UIHelpers.updateOnlineStatusUI(this.elements.onlineStatus, status);
+    }
+
+    /**
+     * Check actual network connectivity
+     */
+    async checkNetworkConnectivity() {
+        try {
+            const response = await fetch('https://www.google.com/favicon.ico', { mode: 'no-cors' });
+            return true;
+        } catch (error) {
+            console.log('Network connectivity check failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Update online status with connectivity check
+     */
+    async updateOnlineStatusWithConnectivityCheck() {
+        const isActuallyOnline = await this.checkNetworkConnectivity();
+        this.updateOnlineStatus(isActuallyOnline);
+        
+        // Register service worker if offline
+        if (!isActuallyOnline && typeof navigator !== 'undefined' && navigator.serviceWorker) {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+        }
+    }
+
+    /**
+     * Show error message
+     * @param {string} message Error message
+     */
+    showError(message) {
+        console.error(message);
+        this.state.hasError = true;
+        this.state.errorMessage = message;
+        this.state.isLoading = false;
+        
+        this.updateScreen();
+        this.UIHelpers.updateErrorMessage(
+            this.elements.locationDenied,
+            'An error occurred',
+            message
+        );
+    }
+
+    /**
      * Update all displays with current data
      */
     async updateAllDisplays() {
-        if (!this.currentLocation) return;
+        if (!this.state.location) return;
         
         try {
             await Promise.all([
@@ -175,15 +310,15 @@ class AnalemmaPWA {
      * Update the solar noon time display
      */
     async updateTimeDisplay() {
-        if (!this.currentLocation) return;
+        if (!this.state.location || !this.elements.noonTime) return;
         
         try {
-            const solarNoon = window.SolarCalculations.calculateSolarNoon(
-                this.currentLocation.longitude, 
-                this.currentDate
+            const solarNoon = this.SolarCalculations.calculateSolarNoon(
+                this.state.location.longitude, 
+                this.state.currentDate
             );
             
-            const timeString = window.SolarCalculations.formatSolarNoonTime(solarNoon, true);
+            const timeString = this.SolarCalculations.formatSolarNoonTime(solarNoon, true);
             this.elements.noonTime.textContent = timeString;
             
         } catch (error) {
@@ -196,10 +331,10 @@ class AnalemmaPWA {
      * Update the location information display
      */
     updateLocationDisplay() {
-        if (!this.currentLocation) return;
+        if (!this.state.location || !this.elements.locationInfo) return;
         
-        const locationString = window.LocationUtils.formatLocationForDisplay(this.currentLocation);
-        const accuracy = window.LocationUtils.getAccuracyDescription(this.currentLocation.accuracy);
+        const locationString = this.LocationUtils.formatLocationForDisplay(this.state.location);
+        const accuracy = this.LocationUtils.getAccuracyDescription(this.state.location.accuracy);
         
         this.elements.locationInfo.textContent = `${locationString} (${accuracy})`;
     }
@@ -208,49 +343,53 @@ class AnalemmaPWA {
      * Update the analemma visualization
      */
     async updateAnalemmaDisplay() {
-        if (!this.currentLocation) return;
+        if (!this.state.location || !this.elements.analemmaSvg) return;
         
         try {
             // Check for extreme latitude conditions
-            const isExtreme = window.SolarCalculations.isSunBelowHorizonAtNoon(
-                this.currentLocation.latitude, 
-                this.currentDate
+            const isExtreme = this.SolarCalculations.isSunBelowHorizonAtNoon(
+                this.state.location.latitude, 
+                this.state.currentDate
             );
             
-            if (isExtreme) {
-                this.elements.app.classList.add('extreme-latitude');
-                this.elements.extremeMessage.classList.remove('hidden');
-            } else {
-                this.elements.app.classList.remove('extreme-latitude');
-                this.elements.extremeMessage.classList.add('hidden');
+            if (this.elements.app) {
+                if (isExtreme) {
+                    this.elements.app.classList.add('extreme-latitude');
+                    this.elements.extremeMessage?.classList.remove('hidden');
+                } else {
+                    this.elements.app.classList.remove('extreme-latitude');
+                    this.elements.extremeMessage?.classList.add('hidden');
+                }
             }
             
             // Get analemma coordinates
-            const allCoords = await window.AnalemmaCalculations.getAllAnalemmaCoordinates();
-            const todayCoords = await window.AnalemmaCalculations.getAnalemmaCoordinatesForDate(this.currentDate);
+            const allCoords = await this.AnalemmaCalculations.getAllAnalemmaCoordinates();
+            const todayCoords = await this.AnalemmaCalculations.getAnalemmaCoordinatesForDate(this.state.currentDate);
             
             // Convert ALL coordinates to SVG (including today's) to get consistent bounds
             const allCoordsWithToday = [...allCoords, todayCoords];
             
-            const svgCoords = window.AnalemmaCalculations.convertToSVGCoordinates(allCoordsWithToday);
+            const svgCoords = this.AnalemmaCalculations.convertToSVGCoordinates(allCoordsWithToday);
             
             // Separate the analemma path from today's position
             const analemmaCoords = svgCoords.slice(0, allCoords.length);
             const todaySvgCoords = svgCoords.slice(-1); // Last coordinate is today's
             
-            const correctedCoords = window.AnalemmaCalculations.applyHemisphereCorrection(
+            const correctedCoords = this.AnalemmaCalculations.applyHemisphereCorrection(
                 analemmaCoords, 
-                this.currentLocation.latitude
+                this.state.location.latitude
             );
             
-            const todayCorrected = window.AnalemmaCalculations.applyHemisphereCorrection(
+            const todayCorrected = this.AnalemmaCalculations.applyHemisphereCorrection(
                 todaySvgCoords, 
-                this.currentLocation.latitude
+                this.state.location.latitude
             );
             
             // Generate path
-            const pathString = window.AnalemmaCalculations.generateSVGPath(correctedCoords);
-            this.elements.analemmaPath.setAttribute('d', pathString);
+            const pathString = this.AnalemmaCalculations.generateSVGPath(correctedCoords);
+            if (this.elements.analemmaPath) {
+                this.elements.analemmaPath.setAttribute('d', pathString);
+            }
             
             // Position sun marker
             if (todayCorrected.length > 0) {
@@ -267,6 +406,8 @@ class AnalemmaPWA {
      * @param {Object} coords SVG coordinates
      */
     updateSunMarker(coords) {
+        if (!this.elements.sunMarker) return;
+        
         // Create sun icon SVG
         const sunIcon = `
             <circle cx="${coords.svgX}" cy="${coords.svgY}" r="8" fill="#FFD700" stroke="#FFA500" stroke-width="2"/>
@@ -283,16 +424,18 @@ class AnalemmaPWA {
      * Update the direction indicator
      */
     updateDirectionDisplay() {
-        if (!this.currentLocation) return;
+        if (!this.state.location || !this.elements.directionLabel) return;
         
-        const direction = window.SolarCalculations.getAnalemmaDirection(this.currentLocation.latitude);
+        const direction = this.SolarCalculations.getAnalemmaDirection(this.state.location.latitude);
         this.elements.directionLabel.textContent = direction;
         
         // Rotate arrow for Southern Hemisphere
-        if (this.currentLocation.latitude < 0) {
-            this.elements.directionArrow.style.transform = 'rotate(180deg)';
-        } else {
-            this.elements.directionArrow.style.transform = '';
+        if (this.elements.directionArrow) {
+            if (this.state.location.latitude < 0) {
+                this.elements.directionArrow.style.transform = 'rotate(180deg)';
+            } else {
+                this.elements.directionArrow.style.transform = '';
+            }
         }
     }
 
@@ -302,101 +445,14 @@ class AnalemmaPWA {
     checkDateChange() {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const currentDay = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth(), this.currentDate.getDate());
+        const currentDay = new Date(this.state.currentDate.getFullYear(), this.state.currentDate.getMonth(), this.state.currentDate.getDate());
         
         if (today.getTime() !== currentDay.getTime()) {
             console.log('Date changed, updating displays');
-            this.currentDate = now;
-            if (this.isInitialized) {
+            this.state.currentDate = now;
+            if (this.state.location) {
                 this.updateAllDisplays();
             }
-        }
-    }
-
-    /**
-     * Show location permission prompt
-     */
-    showLocationPrompt() {
-        this.hideAllScreens();
-        this.elements.locationPrompt.classList.remove('hidden');
-    }
-
-    /**
-     * Show location denied message
-     */
-    showLocationDenied() {
-        this.hideAllScreens();
-        this.elements.locationDenied.classList.remove('hidden');
-    }
-
-    /**
-     * Show loading screen
-     * @param {string} message Loading message
-     */
-    showLoading(message = 'Loading...') {
-        this.hideAllScreens();
-        this.elements.loading.classList.remove('hidden');
-        const loadingText = this.elements.loading.querySelector('p');
-        if (loadingText) {
-            loadingText.textContent = message;
-        }
-    }
-
-    /**
-     * Show main application content
-     */
-    showMainContent() {
-        this.hideAllScreens();
-        this.elements.mainContent.classList.remove('hidden');
-    }
-
-    /**
-     * Show error message
-     * @param {string} message Error message
-     */
-    showError(message) {
-        console.error(message);
-        // For now, show in location denied screen
-        this.showLocationDenied();
-        const errorContent = this.elements.locationDenied.querySelector('.error-content h2');
-        if (errorContent) {
-            errorContent.textContent = 'An error occurred';
-        }
-        const errorText = this.elements.locationDenied.querySelector('.error-content p');
-        if (errorText) {
-            errorText.textContent = message;
-        }
-    }
-
-    /**
-     * Hide all screen elements
-     */
-    hideAllScreens() {
-        this.elements.locationPrompt.classList.add('hidden');
-        this.elements.locationDenied.classList.add('hidden');
-        this.elements.loading.classList.add('hidden');
-        this.elements.mainContent.classList.add('hidden');
-    }
-
-    /**
-     * Update online status display and state
-     * @param {boolean} isOnline Whether the device is online
-     */
-    updateOnlineStatus(isOnline) {
-        this.isOnline = isOnline;
-        
-        if (this.elements.onlineStatus) {
-            const statusText = this.elements.onlineStatus.querySelector('.status-text');
-            if (statusText) {
-                statusText.textContent = isOnline ? 'Online' : 'Offline';
-            }
-            this.elements.onlineStatus.className = `status-indicator ${isOnline ? 'online' : 'offline'}`;
-        }
-        
-        // If we're offline, try to use cached data
-        if (!isOnline && this.currentLocation) {
-            console.log('Device is offline, using cached data');
-            // The app should continue working with cached data
         }
     }
 }

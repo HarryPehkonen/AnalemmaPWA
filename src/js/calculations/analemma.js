@@ -3,11 +3,11 @@
  * Handles loading and processing of pre-calculated analemma data
  */
 
-let analemmaCacheData = null;
+let analemmaData = null;
 
 async function loadAnalemmaData() {
-    if (analemmaCacheData) {
-        return analemmaCacheData;
+    if (analemmaData) {
+        return analemmaData;
     }
 
     try {
@@ -15,10 +15,8 @@ async function loadAnalemmaData() {
         if (!response.ok) {
             throw new Error(`Failed to load analemma data: ${response.status}`);
         }
-        
-        analemmaCacheData = await response.json();
-        console.log('Analemma data loaded successfully');
-        return analemmaCacheData;
+        analemmaData = await response.json();
+        return analemmaData;
     } catch (error) {
         console.error('Error loading analemma data:', error);
         throw new Error('Could not load analemma coordinate data');
