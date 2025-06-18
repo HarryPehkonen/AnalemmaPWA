@@ -35,6 +35,7 @@ class AnalemmaPWA {
         this.locationSource = 'none'; // 'current', 'cached', 'test'
         
         this.bindEvents();
+        this.updateOnlineStatus(this.isOnline); // Initialize online status display
     }
 
     /**
@@ -376,10 +377,39 @@ class AnalemmaPWA {
         this.elements.loading.classList.add('hidden');
         this.elements.mainContent.classList.add('hidden');
     }
+
+    /**
+     * Update online status display and state
+     * @param {boolean} isOnline Whether the device is online
+     */
+    updateOnlineStatus(isOnline) {
+        this.isOnline = isOnline;
+        
+        if (this.elements.onlineStatus) {
+            const statusText = this.elements.onlineStatus.querySelector('.status-text');
+            if (statusText) {
+                statusText.textContent = isOnline ? 'Online' : 'Offline';
+            }
+            this.elements.onlineStatus.className = `status-indicator ${isOnline ? 'online' : 'offline'}`;
+        }
+        
+        // If we're offline, try to use cached data
+        if (!isOnline && this.currentLocation) {
+            console.log('Device is offline, using cached data');
+            // The app should continue working with cached data
+        }
+    }
+}
+
+// Export the class for testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { AnalemmaPWA };
 }
 
 // Initialize application when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    const app = new AnalemmaPWA();
-    app.initialize();
-}); 
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        const app = new AnalemmaPWA();
+        app.initialize();
+    });
+} 
