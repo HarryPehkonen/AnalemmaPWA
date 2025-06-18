@@ -42,7 +42,12 @@ class AnalemmaPWA {
         };
         
         this.bindEvents();
+        // Set initial online status immediately based on browser state
         this.updateOnlineStatus(navigator.onLine);
+        // Then verify with actual connectivity check
+        if (typeof window !== 'undefined') {
+            this.updateOnlineStatusWithConnectivityCheck();
+        }
     }
 
     /**
@@ -85,17 +90,25 @@ class AnalemmaPWA {
         this.elements.retryLocationBtn?.addEventListener('click', () => this.requestLocation());
         
         // Online/offline status
-        window.addEventListener('online', () => this.updateOnlineStatusWithConnectivityCheck());
-        window.addEventListener('offline', () => this.updateOnlineStatusWithConnectivityCheck());
+        window.addEventListener('online', () => {
+            // Immediately update UI based on browser's online state
+            this.updateOnlineStatus(true);
+            // Then verify with actual connectivity check
+            this.updateOnlineStatusWithConnectivityCheck();
+        });
+        
+        window.addEventListener('offline', () => {
+            // Immediately update UI to offline
+            this.updateOnlineStatus(false);
+            // Still do connectivity check (though it will likely fail)
+            this.updateOnlineStatusWithConnectivityCheck();
+        });
         
         // Update every minute
         setInterval(() => this.updateTimeDisplay(), 60000);
         
         // Update daily at midnight
         setInterval(() => this.checkDateChange(), 60000);
-
-        // Initial online status check
-        this.updateOnlineStatusWithConnectivityCheck();
     }
 
     /**

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'analemma-pwa-v1';
+const CACHE_NAME = 'analemma-pwa-v202506171931';
 const urlsToCache = [
   './',
   './index.html',

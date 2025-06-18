@@ -183,6 +183,26 @@ describe('AnalemmaPWA Integration Tests', () => {
             expect(statusElement.className).toBe('status-indicator offline');
             expect(statusElement.querySelector('.status-text').textContent).toBe('Offline');
         });
+        
+        test('responds immediately to online/offline events', () => {
+            const statusElement = document.getElementById('online-status');
+            
+            // Simulate offline event
+            const offlineEvent = new Event('offline');
+            window.dispatchEvent(offlineEvent);
+            
+            // Should immediately show offline
+            expect(statusElement.className).toBe('status-indicator offline');
+            expect(statusElement.querySelector('.status-text').textContent).toBe('Offline');
+            
+            // Simulate online event
+            const onlineEvent = new Event('online');
+            window.dispatchEvent(onlineEvent);
+            
+            // Should immediately show online
+            expect(statusElement.className).toBe('status-indicator online');
+            expect(statusElement.querySelector('.status-text').textContent).toBe('Online');
+        });
     });
 
     describe('Permission Handling', () => {
