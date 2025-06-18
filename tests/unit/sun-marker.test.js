@@ -6,6 +6,18 @@
 // Simple DOM mock for tests
 global.window = {};
 
+// Mock fetch for Node.js environment
+global.fetch = async (url) => {
+    const fs = require('fs');
+    const path = require('path');
+    const dataPath = path.join(__dirname, '../../src/assets/analemma-data.json');
+    const data = fs.readFileSync(dataPath, 'utf8');
+    return {
+        ok: true,
+        json: async () => JSON.parse(data)
+    };
+};
+
 // Load the required modules
 const fs = require('fs');
 const path = require('path');
