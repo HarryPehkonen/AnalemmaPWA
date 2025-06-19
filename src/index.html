@@ -106,14 +106,33 @@
     </div>
 
     <!-- Scripts -->
+    <!-- Core modules (no dependencies) -->
+    <script src="js/core/status-logic.js"></script>
+    <script src="js/core/app-state.js"></script>
+    
+    <!-- Calculation modules -->
     <script src="js/calculations/solar.js"></script>
     <script src="js/calculations/analemma.js"></script>
+    
+    <!-- Service modules -->
+    <script src="js/services/browser-services.js"></script>
+    <script src="js/services/location-service.js"></script>
+    
+    <!-- UI modules -->
+    <script src="js/ui/renderers.js"></script>
+    <script src="js/ui/dom-updater.js"></script>
+    
+    <!-- Visualization modules -->
+    <script src="js/visualization/analemma-renderer.js"></script>
+    
+    <!-- Legacy modules (for backward compatibility) -->
     <script src="js/utils/location.js"></script>
     <script src="js/ui/display.js"></script>
     <script src="js/ui/visualization.js"></script>
-    <script src="js/core/status-logic.js"></script>
     <script src="js/ui/ui-helpers.js"></script>
-    <script src="js/app.js"></script>
+    
+    <!-- Main application -->
+    <script src="js/app-simple.js"></script>
 
     <!-- Service Worker Registration -->
     <script>

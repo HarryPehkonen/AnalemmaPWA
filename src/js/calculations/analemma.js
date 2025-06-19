@@ -142,4 +142,9 @@ window.AnalemmaCalculations = {
     getAnalemmaBounds,
     getAnalemmaMetadata,
     getDayOfYear
-}; 
+};
+
+// Export for testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = window.AnalemmaCalculations;
+} 

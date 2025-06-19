@@ -176,4 +176,9 @@ window.SolarCalculations = {
     getDayOfYear,
     calculateSolarDeclination,
     calculateEquationOfTime
-}; 
+};
+
+// Export for testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = window.SolarCalculations;
+} 
